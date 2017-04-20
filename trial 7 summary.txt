@@ -1,0 +1,15 @@
+Use k > 3000:
+
+--- 175.18200016 seconds ---
+--- 184.475000143 seconds ---
+--- 215.335000038 seconds ---
+
+<<<
+_2: k > 10000 (2200 tweets, 1100 hashtags)
+
+--- 728.960000038 seconds ---
+--- 753.342000008 seconds ---
+--- 843.623000145 seconds ---
+
+<<<
+Next, get tweets in the same area (music) but two very different communities of music. see if you can distinguish them
