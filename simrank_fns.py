@@ -2,14 +2,11 @@ import pdb, traceback, sys
 import csv
 import operator
 import collections
-import networkx as nx
-from networkx.algorithms import bipartite
 import numpy
 
 #compute distance between two graphs. If > 5, do not calculate a pair for them
-#Create a bipartite graph of tweets and hashtags. Map each tweet to a pos int ID and each hashtag to a neg int ID
-def create_graph(data_file):
-  lim = 10000
+#Create a bipartite graph of tweets and hashtags. Map each tweet to a pos int ID and each hashtag to a neg int ID to save memory in scores hash table
+def create_graph(data_file, lim):
   graph_dict = {}
   adj_matrix = []
   index_id = {} #id : adj matrix row index (later flip them)
@@ -18,7 +15,7 @@ def create_graph(data_file):
   i=1 #tweet id
   j = -1 #hashtag id
   n = -1 #start at -1 b/c +1 when new node. index id
-  k=1
+  k = 1
   f = open(data_file, 'r')
   hashtags = []
   hashtag_labels = {} #id : hashtag
@@ -62,6 +59,7 @@ def create_graph(data_file):
   adj_matrix = numpy.matrix(adj_matrix)
   return graph_dict, adj_matrix, tweet_labels, hashtag_labels, index_id
 
+#matches index id (in adj matrix) to id 
 def index_to_id(nonzeros, index_id):
   index_id = {v: k for k, v in index_id.iteritems()} #index_id : id
   id_nonzeros = {} #faster to check if exists in hash table than in array
@@ -70,31 +68,11 @@ def index_to_id(nonzeros, index_id):
     id_nonzeros[new_entry] = 0
   return id_nonzeros
 
-#Create G^2
-def create_G_sq(G, id_nonzeros, tweet_labels):
-  G_sq = {}
-  for tw_1 in tweet_labels:
-    for tw_2 in tweet_labels:
-      if (tw_1,tw_2) not in G_sq or (tw_2,tw_1) not in G_sq:
-        if (tw_1,tw_2) in id_nonzeros or (tw_2,tw_1) in id_nonzeros: #symmetric
-          neighbors = {} #reset neighbors for each new tweet pair
-          G_sq[(tw_1,tw_2)] = [] #tweet nodes
-          for ht_1 in G[tw_1]:    #add in hashtag pair nodes
-            for ht_2 in G[tw_2]:
-              if (ht_1,ht_2) not in neighbors or (ht_2,ht_1) not in neighbors:
-                neighbors[(ht_1,ht_2)] = []
-                G_sq[(tw_1,tw_2)].append((ht_1,ht_2))
-              if (ht_1,ht_2) not in G_sq or (ht_2,ht_1) not in G_sq:   #hashtag nodes. if already in graph
-                G_sq[(ht_1,ht_2)] = [(tw_1,tw_2)]
-              else:
-                G_sq[(ht_1,ht_2)].append((tw_1,tw_2))
-  return G_sq     
-
-#run SimRank on G^2 to calculate similarity scores
-def simrank(G, G_sq):
+#run SimRank on G and id_nonzeros to calculate similarity scores
+def simrank(G, id_nonzeros):
   C=0.8 #decay factor
   node_scores={}
-  for node in G_sq:
+  for node in id_nonzeros:
     x = node[0]
     y = node[1]
     if x == y:
@@ -103,8 +81,8 @@ def simrank(G, G_sq):
       node_scores[(x,y)] = 0
 
   for k in range(5): #5 iterations
-    for node in G_sq:
-      x = node[0] #don't call it a and b b/c messes it up in pdb?
+    for node in id_nonzeros:
+      x = node[0] #don't call it a and b b/c messes it up in pdb
       y = node[1]
       if x != y:
         sim_sum = 0
@@ -144,8 +122,6 @@ def make_graph_csv(filename, graph_dict,hashtag_labels):
       for t in edges:
           row += ';' + str(t)
       csv.write(row + '\n')
-  #for v in hashtag_labels.values():
-    #csv.write(str(v) + '\n')
   csv.close()
 
 if __name__ == '__main__':

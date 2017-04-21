@@ -3,50 +3,60 @@ import time
 import operator
 import numpy
 from simrank_fns import *
+import os
+import pickle
 
 def main():
   start_time = time.time()
-  #get node_scores, G^2, and the dicts that pair tweets w/ id and hashtags w/ id
-  data_file = 'C:\Users\Michael\Documents\_rsch\classes sp17/algo\project code/trial 5/data_7_gen_2_plain.txt'
-  #graph, tweet_ids, hashtag_ids, graph_dict = create_graph(data_file) #trial 4
-  graph_dict, adj_matrix, tweet_ids, hashtag_ids, index_id = create_graph(data_file) 
+  cwd = os.getcwd()
+  limit = 2000 #limit on number of nodes in graph (both tweets and hashtags)
 
-  filename = 'C:\Users\Michael\Documents\_rsch\classes sp17/algo\project code/trial 7/data_7_gen_2_bigraph_2.txt'
+  #get graph adj list, adj matrix, and the dicts that pair tweets w/ id and hashtags w/ id
+  data_file = cwd + '\\data_7_gen_2_plain.txt'
+  graph_dict, adj_matrix, tweet_ids, hashtag_ids, index_id = create_graph(data_file, limit) 
+
+  fn_1 = cwd + '\\data_7_gen_2_bigraph.txt'
   sorted_graph = sorted(graph_dict.items())
-  make_list_tuples(filename,sorted_graph)
+  make_list_tuples(fn_1,sorted_graph)
   
-  filename_2 = 'C:\Users\Michael\Documents\_rsch\classes sp17/algo\project code/trial 7/data_7_gen_2_tweets_2.txt'
-  make_list(filename_2,tweet_ids)
+  fn_2 = cwd + '\\data_7_gen_2_tweets.txt'
+  make_list(fn_2,tweet_ids)
 
-  filename_3 = 'C:\Users\Michael\Documents\_rsch\classes sp17/algo\project code/trial 7/data_7_gen_2_hashtags_2.txt'
+  fn_3 = cwd + '\\data_7_gen_2_hashtags.txt'
   sorted_hashtag_ids = collections.OrderedDict(sorted(hashtag_ids.items()))
-  make_list(filename_3, sorted_hashtag_ids)
+  make_list(fn_3, sorted_hashtag_ids)
 
+  #store dict option so it can be loaded into hashtag_search.py later
+  pickle.dump(graph_dict, open(cwd + '\\data_7_gen_2_bigraph.p', "wb" ))
+  pickle.dump(tweet_ids, open(cwd + '\\data_7_gen_2_tweets.p', "wb" ))
+  pickle.dump(hashtag_ids, open(cwd + '\\data_7_gen_2_hashtags.p', "wb" ))
+
+  #calculate summed even powers of adj matrix to find which node pairs are within path of len K away
   test = adj_matrix
-  sums = test
   for i in range(2): 
     test = numpy.dot(test,test) #range(k) means up to G^(2^(i+1))
     if i != 0:
       sums = sums + test
     else:
       sums = test
-
+  time_pt_1 = time.time() - start_time
+  print("Sum even powers of adj matrix: %s seconds" % (time_pt_1))
+  for i in range(len(sums)):
+    if numpy.count_nonzero(sums[i]) > 0:  #if there exists nonzeros in node
+      sums[i,i] += 1 #make the diagonal entry of sums be nonzero so that it is included in id_nonzeros
+  
+  #get nonzeros of summed even powers of adj matrix to find node pairs which have decently big simrank scores. saves memory.
   #first convert each node into an index #. then convert back. may req 2 hashtables
   nonzeros = numpy.transpose(numpy.nonzero(sums))
   id_nonzeros = index_to_id(nonzeros, index_id)
-  print("--- %s seconds ---" % (time.time() - start_time))
+  time_pt_2 = time.time() - start_time
+  print("Calculate Simrank: %s seconds" % (time_pt_2 - time_pt_1))
   
-  graph_sq = create_G_sq(graph_dict, id_nonzeros, tweet_ids)  #create G^2 from bipartite graph
-  #fn_4 = 'C:\Users\Michael\Documents\_rsch\classes sp17/algo\project code/trial 6/data_7_gen_2_G_sq.txt'
-  #make_list(fn_4, graph_sq)
-  print("--- %s seconds ---" % (time.time() - start_time))
+  scores, sorted_scores = simrank(graph_dict, id_nonzeros) #run simrank to get node pair scores
+  fn_4 = cwd + '\\data_7_gen_2_scores.txt'
+  make_list_tuples(fn_4, sorted_scores)
+  pickle.dump(scores, open(cwd + '\\data_7_gen_2_scores.p', "wb" ))
 
-  scores, sorted_scores = simrank(graph_dict, graph_sq) #run simrank
-  fn_5 = 'C:\Users\Michael\Documents\_rsch\classes sp17/algo\project code/trial 7/data_7_gen_2_scores_2.txt'
-  make_list_tuples(fn_5, sorted_scores)
-
-  print("--- %s seconds ---" % (time.time() - start_time))
-  
 
 if __name__ == '__main__':
     try:
